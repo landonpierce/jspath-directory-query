@@ -29,7 +29,17 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	});
 
+	// Register the workspace command
+	const disposable2 = vscode.commands.registerCommand('query-by-jsonpath.queryWorkspace', async () => {
+		try {
+			await queryJSONFilesInWorkspace();
+		} catch (error) {
+			vscode.window.showErrorMessage(`Error querying JSON files in workspace: ${error}`);
+		}
+	});
+
 	context.subscriptions.push(disposable);
+	context.subscriptions.push(disposable2);
 }
 
 // This method is called when your extension is deactivated
@@ -78,7 +88,15 @@ async function queryJSONFiles(): Promise<void> {
 	}, async (progress) => {
 		try {
 			const results = await searchJSONFiles(selectedDirectory, jsonPathQuery.trim());
-			displayResults(results, selectedDirectory, jsonPathQuery.trim());
+			// Show results in webview
+		const panel = vscode.window.createWebviewPanel(
+			'jsonPathResults',
+			`JSONPath Results (${results.length} matches)`,
+			vscode.ViewColumn.Two,
+			{}
+		);
+		
+		panel.webview.html = generateWebviewContent(results);
 		} catch (error) {
 			vscode.window.showErrorMessage(`Error during search: ${error}`);
 		}
@@ -89,14 +107,27 @@ async function searchJSONFiles(directory: string, jsonPathQuery: string): Promis
 	const results: QueryResult[] = [];
 	
 	try {
+		await searchJSONFilesRecursive(directory, jsonPathQuery, results);
+	} catch (error) {
+		// Silently ignore directory read errors
+		console.log(`Error reading directory ${directory}: ${error}`);
+	}
+	
+	return results;
+}
+
+async function searchJSONFilesRecursive(directory: string, jsonPathQuery: string, results: QueryResult[]): Promise<void> {
+	try {
 		const files = fs.readdirSync(directory);
 		
 		for (const file of files) {
 			const filePath = path.join(directory, file);
 			const stat = fs.statSync(filePath);
 			
-			// Only process .json files in the specified directory (not recursive)
-			if (stat.isFile() && path.extname(file).toLowerCase() === '.json') {
+			if (stat.isDirectory()) {
+				// Recursively search subdirectories
+				await searchJSONFilesRecursive(filePath, jsonPathQuery, results);
+			} else if (stat.isFile() && path.extname(file).toLowerCase() === '.json') {
 				try {
 					const fileContent = fs.readFileSync(filePath, 'utf-8');
 					const jsonData = JSON.parse(fileContent);
@@ -126,8 +157,52 @@ async function searchJSONFiles(directory: string, jsonPathQuery: string): Promis
 		// Silently ignore directory read errors
 		console.log(`Error reading directory ${directory}: ${error}`);
 	}
+}
+
+async function queryJSONFilesInWorkspace(): Promise<void> {
+	const jsonPathQuery = await vscode.window.showInputBox({
+		prompt: 'Enter JSONPath query (e.g., $.key or $..property)',
+		placeHolder: '$.property'
+	});
 	
-	return results;
+	if (!jsonPathQuery) {
+		return; // User cancelled
+	}
+	
+	// Get workspace folder
+	const workspaceFolders = vscode.workspace.workspaceFolders;
+	if (!workspaceFolders || workspaceFolders.length === 0) {
+		vscode.window.showErrorMessage('No workspace folder is open');
+		return;
+	}
+	
+	const workspaceRoot = workspaceFolders[0].uri.fsPath;
+	
+	// Show progress while searching
+	await vscode.window.withProgress({
+		location: vscode.ProgressLocation.Notification,
+		title: 'Searching workspace...',
+		cancellable: false
+	}, async (progress) => {
+		progress.report({ message: 'Searching for JSON files in workspace...' });
+		
+		const results = await searchJSONFiles(workspaceRoot, jsonPathQuery);
+		
+		if (results.length === 0) {
+			vscode.window.showInformationMessage('No matches found for the specified JSONPath query.');
+			return;
+		}
+		
+		// Show results in webview
+		const panel = vscode.window.createWebviewPanel(
+			'jsonPathResults',
+			`JSONPath Results (${results.length} matches)`,
+			vscode.ViewColumn.Two,
+			{}
+		);
+		
+		panel.webview.html = generateWebviewContent(results);
+	});
 }
 
 function findLineNumber(fileContent: string, value: any): number {
@@ -147,28 +222,8 @@ function findLineNumber(fileContent: string, value: any): number {
 	return 1; // Default to line 1 if not found
 }
 
-function displayResults(results: QueryResult[], directory: string, query: string): void {
-	if (results.length === 0) {
-		vscode.window.showInformationMessage('No results found for the specified JSONPath query.');
-		return;
-	}
-
-	// Create and show webview
-	const panel = vscode.window.createWebviewPanel(
-		'jsonPathResults',
-		'JSONPath Query Results',
-		vscode.ViewColumn.One,
-		{
-			enableScripts: true
-		}
-	);
-
-	panel.webview.html = generateResultsHTML(results, directory, query);
-}
-
-function generateResultsHTML(results: QueryResult[], directory: string, query: string): string {
+function generateWebviewContent(results: QueryResult[]): string {
 	const tableRows = results.map(result => {
-		const relativePath = path.relative(directory, result.filePath);
 		const valueDisplay = typeof result.matchedValue === 'string' 
 			? result.matchedValue 
 			: JSON.stringify(result.matchedValue, null, 2);
@@ -183,7 +238,7 @@ function generateResultsHTML(results: QueryResult[], directory: string, query: s
 		
 		return `
 			<tr>
-				<td title="${result.filePath}">${relativePath}</td>
+				<td title="${result.filePath}">${result.filePath}</td>
 				<td><pre>${escapedValue}</pre></td>
 				<td>${result.lineNumber}</td>
 			</tr>
@@ -250,8 +305,6 @@ function generateResultsHTML(results: QueryResult[], directory: string, query: s
     <div class="header">
         <h1>JSONPath Query Results</h1>
         <div class="query-info">
-            <strong>Directory:</strong> ${directory}<br>
-            <strong>Query:</strong> <code>${query}</code><br>
             <span class="results-count">Found ${results.length} result(s)</span>
         </div>
     </div>

@@ -5,17 +5,23 @@ A VS Code extension that allows you to query JSON files in a directory using JSO
 ## Features
 
 - **Directory Selection**: Choose any directory to search for JSON files
+- **Workspace Search**: Search JSON files in the current workspace with one command
+- **Recursive Search**: Automatically searches all subdirectories for JSON files
 - **JSONPath Querying**: Use powerful JSONPath expressions to find specific data
 - **Table Results**: View results in an organized table with file paths, matched values, and line numbers
+- **Large File Support**: Efficiently handles large JSON files (tested with 5000+ lines)
 - **Error Handling**: Gracefully handles invalid JSON files and JSONPath expressions
 
 ## Usage
 
 1. Open the Command Palette (`Cmd+Shift+P` on macOS, `Ctrl+Shift+P` on Windows/Linux)
-2. Type "Query JSON Files by JSONPath" and select the command
-3. Choose a directory containing JSON files
-4. Enter a JSONPath expression (e.g., `$.users[*].name` or `$.store.book[*].title`)
-5. View the results in the opened webview
+2. Choose one of these commands:
+   - **"Query JSON Files by JSONPath (Select Directory)"** - Choose a specific directory to search
+   - **"Query JSON Files by JSONPath (Current Workspace)"** - Search the current workspace
+3. Enter a JSONPath expression (e.g., `$.data.users[*].name` or `$.data.books[*].title`)
+4. View the results in the opened webview
+
+The extension will recursively search through all subdirectories to find JSON files.
 
 ## JSONPath Examples
 
@@ -74,13 +80,14 @@ Try these queries with the test data:
 
 This extension contributes the following commands:
 
-- `query-by-jsonpath.queryFiles`: Query JSON Files by JSONPath
+- `query-by-jsonpath.queryFiles`: Query JSON Files by JSONPath (Select Directory)
+- `query-by-jsonpath.queryWorkspace`: Query JSON Files by JSONPath (Current Workspace)
 
 ## Known Issues
 
 - Line number detection is basic and may not be accurate for complex nested structures
-- Only searches the specified directory (not recursive)
-- Only processes files with `.json` extension
+- Very large files (>100MB) may impact performance
+- JSONPath conditional queries may be slower on large datasets
 
 ## Release Notes
 

@@ -15,7 +15,11 @@
     "commands": [
       {
         "command": "query-by-jsonpath.queryFiles",
-        "title": "Query JSON Files by JSONPath"
+        "title": "Query JSON Files by JSONPath (Select Directory)"
+      },
+      {
+        "command": "query-by-jsonpath.queryWorkspace",
+        "title": "Query JSON Files by JSONPath (Current Workspace)"
       }
     ]
   },
