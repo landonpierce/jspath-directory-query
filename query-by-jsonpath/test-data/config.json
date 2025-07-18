@@ -1,0 +1,38 @@
+{
+  "metadata": {
+    "fileName": "config.json",
+    "type": "configuration",
+    "version": "1.0",
+    "lastModified": "2025-01-15"
+  },
+  "data": {
+    "app": {
+      "name": "My Application",
+      "version": "1.2.3",
+      "environment": "production"
+    },
+    "database": {
+      "host": "localhost",
+      "port": 5432,
+      "name": "myapp_db"
+    },
+    "features": {
+      "feature1": true,
+      "feature2": false,
+      "feature3": {
+        "enabled": true,
+        "config": {
+          "maxRetries": 3,
+          "timeout": 5000
+        }
+      }
+    }
+  },
+  "settings": {
+    "debug": true,
+    "logLevel": "info",
+    "maxConnections": 100
+  },
+  "tags": ["production", "database", "config"],
+  "price": 0.00
+}

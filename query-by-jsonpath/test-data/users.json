@@ -1,0 +1,56 @@
+{
+  "metadata": {
+    "fileName": "users.json",
+    "type": "user_directory",
+    "version": "3.2",
+    "lastModified": "2025-01-17"
+  },
+  "data": {
+    "company": {
+      "name": "TechCorp Inc",
+      "department": "Engineering",
+      "location": "San Francisco"
+    },
+    "users": [
+      {
+        "id": 1,
+        "name": "John Doe",
+        "email": "john@example.com",
+        "role": "admin",
+        "department": "IT",
+        "active": true,
+        "salary": 85000
+      },
+      {
+        "id": 2,
+        "name": "Jane Smith",
+        "email": "jane@example.com",
+        "role": "user",
+        "department": "Sales",
+        "active": true,
+        "salary": 65000
+      },
+      {
+        "id": 3,
+        "name": "Bob Johnson",
+        "email": "bob@example.com",
+        "role": "user",
+        "department": "IT",
+        "active": false,
+        "salary": 75000
+      }
+    ],
+    "policies": {
+      "vacation": "20 days",
+      "remote": true,
+      "benefits": "full"
+    }
+  },
+  "settings": {
+    "authRequired": true,
+    "sessionTimeout": 3600,
+    "maxLoginAttempts": 5
+  },
+  "tags": ["employees", "corporate", "tech"],
+  "price": 0.00
+}

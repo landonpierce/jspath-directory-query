@@ -1,0 +1,53 @@
+{
+  "metadata": {
+    "fileName": "store.json",
+    "type": "inventory",
+    "version": "2.1",
+    "lastModified": "2025-01-16"
+  },
+  "data": {
+    "store": {
+      "name": "Bookstore Central",
+      "location": "Downtown",
+      "established": "1995"
+    },
+    "books": [
+      {
+        "id": 1,
+        "title": "Sayings of the Century",
+        "author": "Nigel Rees",
+        "category": "reference",
+        "price": 8.95,
+        "inStock": true
+      },
+      {
+        "id": 2,
+        "title": "Sword of Honour",
+        "author": "Evelyn Waugh",
+        "category": "fiction",
+        "price": 12.99,
+        "inStock": true
+      },
+      {
+        "id": 3,
+        "title": "Moby Dick",
+        "author": "Herman Melville",
+        "category": "fiction",
+        "price": 8.99,
+        "inStock": false
+      }
+    ],
+    "bicycle": {
+      "color": "red",
+      "brand": "Trek",
+      "model": "Mountain Bike"
+    }
+  },
+  "settings": {
+    "openHours": "9AM-6PM",
+    "delivery": true,
+    "discount": 0.15
+  },
+  "tags": ["books", "retail", "downtown"],
+  "price": 19.95
+}

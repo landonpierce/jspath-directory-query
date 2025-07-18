@@ -1,0 +1,274 @@
+// The module 'vscode' contains the VS Code extensibility API
+// Import the module and reference it with the alias vscode in your code below
+import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
+
+const jsonpath = require('jsonpath');
+
+interface QueryResult {
+	filePath: string;
+	matchedValue: any;
+	lineNumber: number;
+}
+
+// This method is called when your extension is activated
+// Your extension is activated the very first time the command is executed
+export function activate(context: vscode.ExtensionContext) {
+
+	// Use the console to output diagnostic information (console.log) and errors (console.error)
+	// This line of code will only be executed once when your extension is activated
+	console.log('Congratulations, your extension "query-by-jsonpath" is now active!');
+
+	// Register the main command
+	const disposable = vscode.commands.registerCommand('query-by-jsonpath.queryFiles', async () => {
+		try {
+			await queryJSONFiles();
+		} catch (error) {
+			vscode.window.showErrorMessage(`Error querying JSON files: ${error}`);
+		}
+	});
+
+	context.subscriptions.push(disposable);
+}
+
+// This method is called when your extension is deactivated
+export function deactivate() {}
+
+async function queryJSONFiles(): Promise<void> {
+	// Step 1: Ask user to select directory
+	const directoryUri = await vscode.window.showOpenDialog({
+		canSelectFiles: false,
+		canSelectFolders: true,
+		canSelectMany: false,
+		openLabel: 'Select Directory to Search'
+	});
+
+	if (!directoryUri || directoryUri.length === 0) {
+		return;
+	}
+
+	const selectedDirectory = directoryUri[0].fsPath;
+
+	// Step 2: Ask user for JSONPath query
+	const jsonPathQuery = await vscode.window.showInputBox({
+		prompt: 'Enter JSONPath query (e.g., $.store.book[*].title)',
+		placeHolder: '$.property.subproperty',
+		validateInput: (value) => {
+			if (!value || value.trim().length === 0) {
+				return 'JSONPath query cannot be empty';
+			}
+			// Basic validation - check if it starts with $
+			if (!value.trim().startsWith('$')) {
+				return 'JSONPath query should start with $';
+			}
+			return null;
+		}
+	});
+
+	if (!jsonPathQuery) {
+		return;
+	}
+
+	// Step 3: Find JSON files and execute query
+	vscode.window.withProgress({
+		location: vscode.ProgressLocation.Notification,
+		title: "Searching JSON files...",
+		cancellable: false
+	}, async (progress) => {
+		try {
+			const results = await searchJSONFiles(selectedDirectory, jsonPathQuery.trim());
+			displayResults(results, selectedDirectory, jsonPathQuery.trim());
+		} catch (error) {
+			vscode.window.showErrorMessage(`Error during search: ${error}`);
+		}
+	});
+}
+
+async function searchJSONFiles(directory: string, jsonPathQuery: string): Promise<QueryResult[]> {
+	const results: QueryResult[] = [];
+	
+	try {
+		const files = fs.readdirSync(directory);
+		
+		for (const file of files) {
+			const filePath = path.join(directory, file);
+			const stat = fs.statSync(filePath);
+			
+			// Only process .json files in the specified directory (not recursive)
+			if (stat.isFile() && path.extname(file).toLowerCase() === '.json') {
+				try {
+					const fileContent = fs.readFileSync(filePath, 'utf-8');
+					const jsonData = JSON.parse(fileContent);
+					
+					// Execute JSONPath query
+					const matches = jsonpath.query(jsonData, jsonPathQuery);
+					
+					if (matches && matches.length > 0) {
+						for (const match of matches) {
+							// For line number, we'll do a simple search in the file content
+							const lineNumber = findLineNumber(fileContent, match);
+							
+							results.push({
+								filePath: filePath,
+								matchedValue: match,
+								lineNumber: lineNumber
+							});
+						}
+					}
+				} catch (error) {
+					// Silently ignore files that can't be parsed or other errors
+					console.log(`Skipping file ${filePath}: ${error}`);
+				}
+			}
+		}
+	} catch (error) {
+		// Silently ignore directory read errors
+		console.log(`Error reading directory ${directory}: ${error}`);
+	}
+	
+	return results;
+}
+
+function findLineNumber(fileContent: string, value: any): number {
+	try {
+		const valueStr = typeof value === 'string' ? value : JSON.stringify(value);
+		const lines = fileContent.split('\n');
+		
+		for (let i = 0; i < lines.length; i++) {
+			if (lines[i].includes(valueStr)) {
+				return i + 1; // Line numbers are 1-based
+			}
+		}
+	} catch (error) {
+		// If we can't find the line number, return 1
+	}
+	
+	return 1; // Default to line 1 if not found
+}
+
+function displayResults(results: QueryResult[], directory: string, query: string): void {
+	if (results.length === 0) {
+		vscode.window.showInformationMessage('No results found for the specified JSONPath query.');
+		return;
+	}
+
+	// Create and show webview
+	const panel = vscode.window.createWebviewPanel(
+		'jsonPathResults',
+		'JSONPath Query Results',
+		vscode.ViewColumn.One,
+		{
+			enableScripts: true
+		}
+	);
+
+	panel.webview.html = generateResultsHTML(results, directory, query);
+}
+
+function generateResultsHTML(results: QueryResult[], directory: string, query: string): string {
+	const tableRows = results.map(result => {
+		const relativePath = path.relative(directory, result.filePath);
+		const valueDisplay = typeof result.matchedValue === 'string' 
+			? result.matchedValue 
+			: JSON.stringify(result.matchedValue, null, 2);
+		
+		// Escape HTML characters
+		const escapedValue = valueDisplay
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;')
+			.replace(/'/g, '&#39;');
+		
+		return `
+			<tr>
+				<td title="${result.filePath}">${relativePath}</td>
+				<td><pre>${escapedValue}</pre></td>
+				<td>${result.lineNumber}</td>
+			</tr>
+		`;
+	}).join('');
+
+	return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSONPath Query Results</title>
+    <style>
+        body {
+            font-family: var(--vscode-font-family);
+            padding: 20px;
+            color: var(--vscode-foreground);
+            background-color: var(--vscode-editor-background);
+        }
+        .header {
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--vscode-panel-border);
+        }
+        .query-info {
+            background-color: var(--vscode-textBlockQuote-background);
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: var(--vscode-editor-background);
+        }
+        th, td {
+            border: 1px solid var(--vscode-panel-border);
+            padding: 8px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+        th {
+            background-color: var(--vscode-editor-selectionBackground);
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background-color: var(--vscode-list-hoverBackground);
+        }
+        pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-width: 400px;
+            overflow-x: auto;
+        }
+        .results-count {
+            color: var(--vscode-descriptionForeground);
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>JSONPath Query Results</h1>
+        <div class="query-info">
+            <strong>Directory:</strong> ${directory}<br>
+            <strong>Query:</strong> <code>${query}</code><br>
+            <span class="results-count">Found ${results.length} result(s)</span>
+        </div>
+    </div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>File Path</th>
+                <th>Matched Value</th>
+                <th>Line Number</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${tableRows}
+        </tbody>
+    </table>
+</body>
+</html>
+	`;
+}
