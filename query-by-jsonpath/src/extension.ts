@@ -9,7 +9,6 @@ const jsonpath = require('jsonpath');
 interface QueryResult {
 	filePath: string;
 	matchedValue: any;
-	lineNumber: number;
 }
 
 // This method is called when your extension is activated
@@ -137,13 +136,9 @@ async function searchJSONFilesRecursive(directory: string, jsonPathQuery: string
 					
 					if (matches && matches.length > 0) {
 						for (const match of matches) {
-							// For line number, we'll do a simple search in the file content
-							const lineNumber = findLineNumber(fileContent, match);
-							
 							results.push({
 								filePath: filePath,
-								matchedValue: match,
-								lineNumber: lineNumber
+								matchedValue: match
 							});
 						}
 					}
@@ -205,23 +200,6 @@ async function queryJSONFilesInWorkspace(): Promise<void> {
 	});
 }
 
-function findLineNumber(fileContent: string, value: any): number {
-	try {
-		const valueStr = typeof value === 'string' ? value : JSON.stringify(value);
-		const lines = fileContent.split('\n');
-		
-		for (let i = 0; i < lines.length; i++) {
-			if (lines[i].includes(valueStr)) {
-				return i + 1; // Line numbers are 1-based
-			}
-		}
-	} catch (error) {
-		// If we can't find the line number, return 1
-	}
-	
-	return 1; // Default to line 1 if not found
-}
-
 function generateWebviewContent(results: QueryResult[]): string {
 	const tableRows = results.map(result => {
 		const valueDisplay = typeof result.matchedValue === 'string' 
@@ -240,7 +218,6 @@ function generateWebviewContent(results: QueryResult[]): string {
 			<tr>
 				<td title="${result.filePath}">${result.filePath}</td>
 				<td><pre>${escapedValue}</pre></td>
-				<td>${result.lineNumber}</td>
 			</tr>
 		`;
 	}).join('');
@@ -314,7 +291,6 @@ function generateWebviewContent(results: QueryResult[]): string {
             <tr>
                 <th>File Path</th>
                 <th>Matched Value</th>
-                <th>Line Number</th>
             </tr>
         </thead>
         <tbody>
